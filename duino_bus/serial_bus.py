@@ -2,21 +2,22 @@
 devices through a serial port.
 
 """
-
-import serial
 import select
+import serial
+from duino_bus.bus import IBus
 
 
-class SerialPort(object):
-    """Implements a PySerial port for use with the Bioloid Bus.
-
+class SerialBus(IBus):
+    """Implements a BioloidBus which sends commands to a bioloid device
+    via a BioloidSerialPort.
     """
 
     def __init__(self, port, baud=1000000):
+        super().__init__()
         self.serial_port = serial.Serial(
                 port=port,
                 baudrate=baud,
-                timeout=0.5,
+                timeout=0.1,
                 bytesize=serial.EIGHTBITS,
                 parity=serial.PARITY_NONE,
                 stopbits=serial.STOPBITS_ONE,
@@ -25,9 +26,19 @@ class SerialPort(object):
                 dsrdtr=False
         )
 
-    def is_byte_available(self):
-        readable, _, _ = select.select([self.serial_port.fileno()], [], [], 0)
-        return bool(readable)
+    def is_data_available(self) -> bool:
+        """Returns True if data is available, False otherwise."""
+        poll = select.poll()
+        poll.register(self.serial_port, select.POLLIN)
+        events = poll.poll(0)
+        return len(events) > 0
+
+    def is_space_available(self) -> bool:
+        """Returns Trus if space is available to write another byte, False otherwise."""
+        poll = select.poll()
+        poll.register(self.serial_port, select.POLLOUT)
+        events = poll.poll(0)
+        return len(events) > 0
 
     def read_byte(self):
         """Reads a byte from the bus. This function will return None if
@@ -43,9 +54,6 @@ class SerialPort(object):
             return data[0]
         return None
 
-    def write_packet(self, packet_data):
-        """Function implemented by a derived class which actually writes
-        the data to a device.
-
-        """
-        self.serial_port.write(packet_data)
+    def write_byte(self, byte: int) -> None:
+        """Writes a byte to the bus."""
+        self.serial_port.write(byte.to_bytes(1, 'little'))

@@ -120,12 +120,7 @@ class Packet:
         """
         Runs a single byte through the packet parsing state PACKET.
         """
-        if len(self.data) >= Packet.MAX_DATA_LEN:
-            self.state = Packet.STATE_IDLE
-            return Error.TOO_MUCH_DATA
-        if byte == Packet.ESC:
-            self.state = Packet.STATE_ESCAPE
-        elif byte == Packet.END:
+        if byte == Packet.END:
             if len(self.data) == 0:
                 # We ignore empty packets
                 return Error.NOT_DONE
@@ -142,8 +137,13 @@ class Packet:
                 return Error.NONE
             print(f'CRC Error: Received 0x{rcvd_crc:02x} Expected: 0x{calc_crc:02x}')
             return Error.CRC
-        else:
-            self.data.append(byte)
+        if len(self.data) >= Packet.MAX_DATA_LEN:
+            self.state = Packet.STATE_IDLE
+            return Error.TOO_MUCH_DATA
+        if byte == Packet.ESC:
+            self.state = Packet.STATE_ESCAPE
+            return Error.NOT_DONE
+        self.data.append(byte)
         return Error.NOT_DONE
 
     def parse_byte_state_escape(self, byte: int) -> int:
